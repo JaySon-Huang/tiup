@@ -94,26 +94,37 @@ const (
 	TiFlashStorageKeyRaftDirs   string = "storage.raft.dir"
 )
 
+func (s TiFlashSpec) getStringsFromConfig(key string) []string {
+	var strs []string
+	if dirsVal, ok := s.Config[key]; ok {
+		if dirs, ok := dirsVal.([]interface{}); ok && len(dirs) > 0 {
+			for _, elem := range dirs {
+				if elemStr, ok := elem.(string); ok {
+					elemStr := strings.TrimSuffix(strings.TrimSpace(elemStr), "/")
+					strs = append(strs, elemStr)
+				}
+			}
+		}
+	}
+	return strs
+}
+
+// GetStorageMainDirs returns the dirs defined in key TiFlashStorageKeyMainDirs
+func (s TiFlashSpec) GetStorageMainDirs() []string {
+	return s.getStringsFromConfig(TiFlashStorageKeyMainDirs)
+}
+
+// GetStorageLatestDirs returns the dirs defined in key TiFlashStorageKeyLatestDirs
+func (s TiFlashSpec) GetStorageLatestDirs() []string {
+	return s.getStringsFromConfig(TiFlashStorageKeyLatestDirs)
+}
+
 // GetOverrideDataDir returns the data dir.
 // If users have defined TiFlashStorageKeyMainDirs, then override "DataDir" with
 // the directories defined in TiFlashStorageKeyMainDirs and TiFlashStorageKeyLatestDirs
 func (s TiFlashSpec) GetOverrideDataDir() (string, error) {
-	getStrings := func(key string) []string {
-		var strs []string
-		if dirsVal, ok := s.Config[key]; ok {
-			if dirs, ok := dirsVal.([]interface{}); ok && len(dirs) > 0 {
-				for _, elem := range dirs {
-					if elemStr, ok := elem.(string); ok {
-						elemStr := strings.TrimSuffix(strings.TrimSpace(elemStr), "/")
-						strs = append(strs, elemStr)
-					}
-				}
-			}
-		}
-		return strs
-	}
-	mainDirs := getStrings(TiFlashStorageKeyMainDirs)
-	latestDirs := getStrings(TiFlashStorageKeyLatestDirs)
+	mainDirs := s.GetStorageMainDirs()
+	latestDirs := s.GetStorageLatestDirs()
 	if len(mainDirs) == 0 && len(latestDirs) == 0 {
 		return s.DataDir, nil
 	}

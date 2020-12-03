@@ -1657,7 +1657,17 @@ func (m *Manager) editTopo(origTopo spec.Topology, data []byte, skipConfirm bool
 		}
 		log.Infof("Nothing changed.")
 		return nil, nil
+	}
 
+	// report error if the difference is invalid
+	if err := spec.ValidateTopologyDiff(origTopo, newTopo); err != nil {
+		fmt.Print(color.RedString("New topology could not be saved: "))
+		log.Errorf("%s", err)
+		if !cliutil.PromptForConfirmNo("Do you want to continue editing? [Y/n]: ") {
+			return m.editTopo(origTopo, newData, skipConfirm)
+		}
+		log.Infof("Nothing changed.")
+		return nil, nil
 	}
 
 	origData, err := yaml.Marshal(origTopo)

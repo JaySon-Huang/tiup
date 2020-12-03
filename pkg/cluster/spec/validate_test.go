@@ -891,3 +891,88 @@ pd_servers:
 	c.Assert(err.Error(), Equals, "component pd_servers.name is not supported duplicated, the name name1 is duplicated")
 
 }
+
+func (s *metaSuiteTopo) TestTopologyDiffTiFlashDirectoryShrinking(c *C) {
+	topo1 := &Specification{}
+	topo2 := &Specification{}
+	err := yaml.Unmarshal([]byte(`
+global:
+  user: "test1"
+  ssh_port: 220
+  deploy_dir: "test-deploy"
+  data_dir: "test-data"
+tiflash_servers:
+  - host: 172.16.5.138
+    config:
+      storage.main.dir:   [/test-1, /test-2]
+      storage.latest.dir: [/test-4, /test-5]
+  - host: 172.16.5.139
+    config:
+      storage.main.dir:   [/test-1, /test-2]
+      storage.latest.dir: [/test-1, /test-2]
+`), topo1)
+	c.Assert(err, IsNil)
+
+	// Expanding is ok
+	err = yaml.Unmarshal([]byte(`
+global:
+  user: "test1"
+  ssh_port: 220
+  deploy_dir: "test-deploy"
+  data_dir: "test-data"
+tiflash_servers:
+  - host: 172.16.5.138
+    config:
+      storage.main.dir:   [/test-1, /test-2, /test-3]
+      storage.latest.dir: [/test-4, /test-5, /test-6]
+  - host: 172.16.5.139
+    config:
+      storage.main.dir:   [/test-1, /test-2]
+      storage.latest.dir: [/test-1, /test-2]
+`), topo2)
+	c.Assert(err, IsNil)
+	err = ValidateTopologyDiff(topo1, topo2)
+	c.Assert(err, IsNil)
+
+	// Shrinking is not allowed
+	err = yaml.Unmarshal([]byte(`
+global:
+  user: "test1"
+  ssh_port: 220
+  deploy_dir: "test-deploy"
+  data_dir: "test-data"
+tiflash_servers:
+  - host: 172.16.5.138
+    config:
+      storage.main.dir:   [/test-2 ]
+      storage.latest.dir: [/test-4, /test-5]
+  - host: 172.16.5.139
+    config:
+      storage.main.dir:   [/test-1, /test-2]
+      storage.latest.dir: [/test-1, /test-2]
+`), topo2)
+	c.Assert(err, IsNil)
+	err = ValidateTopologyDiff(topo1, topo2)
+	c.Assert(err, IsNil)
+
+	// Shrinking is not allowed
+	err = yaml.Unmarshal([]byte(`
+global:
+  user: "test1"
+  ssh_port: 220
+  deploy_dir: "test-deploy"
+  data_dir: "test-data"
+tiflash_servers:
+  - host: 172.16.5.138
+    config:
+      storage.main.dir:   [/test-1, /test-2 ]
+      storage.latest.dir: [/test-4, ]
+  - host: 172.16.5.139
+    config:
+      storage.main.dir:   [/test-1, /test-2]
+      storage.latest.dir: [/test-1, /test-2]
+`), topo2)
+	c.Assert(err, IsNil)
+	err = ValidateTopologyDiff(topo1, topo2)
+	c.Assert(err, IsNil)
+}

@@ -854,6 +854,49 @@ func (s *Specification) Validate() error {
 	return RelativePathDetect(s, isSkipField)
 }
 
+// ValidateTopologyDiff validate the diff between origTopo and newTopo
+func ValidateTopologyDiff(origTopo, newTopo Topology) error {
+	origC := FindComponent(origTopo, ComponentTiFlash)
+	newC := FindComponent(newTopo, ComponentTiFlash)
+	newInstances := newC.Instances()
+	for _, origIns := range origC.Instances() {
+		origID := origIns.ID()
+		matchIndex := -1
+		for i := range newInstances {
+			if newInstances[i].ID() == origID {
+				matchIndex = i
+				break
+			}
+		}
+		if matchIndex == -1 {
+			continue
+		}
+		newLatestDirs := newInstances[matchIndex].(*TiFlashInstance).InstanceSpec.(TiFlashSpec).GetStorageLatestDirs()
+		if len(newLatestDirs) != 0 {
+			// Expanding directories is OK, but shrinking is not allowed.
+			origLatestDirs := origIns.(*TiFlashInstance).InstanceSpec.(TiFlashSpec).GetStorageLatestDirs()
+			origSet := set.NewStringSet(origLatestDirs...)
+			newSet := set.NewStringSet(newLatestDirs...)
+			inter := origSet.Intersection(newSet)
+			if len(inter) != len(origSet) {
+				return fmt.Errorf("shrinking directories of %s.config.%s is not allowed", origID, TiFlashStorageKeyLatestDirs)
+			}
+		}
+		newMainDirs := newInstances[matchIndex].(*TiFlashInstance).InstanceSpec.(TiFlashSpec).GetStorageMainDirs()
+		if len(newMainDirs) != 0 {
+			// Expanding directories is OK, but shrinking is not allowed.
+			origMainDirs := origIns.(*TiFlashInstance).InstanceSpec.(TiFlashSpec).GetStorageMainDirs()
+			origSet := set.NewStringSet(origMainDirs...)
+			newSet := set.NewStringSet(newMainDirs...)
+			inter := origSet.Intersection(newSet)
+			if len(inter) != len(origSet) {
+				return fmt.Errorf("shrinking directories of %s.config.%s is not allowed", origID, TiFlashStorageKeyMainDirs)
+			}
+		}
+	}
+	return nil
+}
+
 // RelativePathDetect detect if some specific path is relative path and report error
 func RelativePathDetect(topo interface{}, isSkipField func(reflect.Value) bool) error {
 	pathTypes := []string{
