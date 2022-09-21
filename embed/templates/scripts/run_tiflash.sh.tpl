@@ -22,4 +22,4 @@ exec numactl --cpunodebind={{.NumaNode}} --membind={{.NumaNode}} bin/tiflash/tif
 {{- else}}
 exec bin/tiflash/tiflash server \
 {{- end}}
-    --config-file conf/tiflash.toml 2>> "{{.LogDir}}/tiflash_stderr.log"
+    --config-file {{.DeployDir}}/conf/tiflash.toml 2>> "{{.LogDir}}/tiflash_stderr.log"
